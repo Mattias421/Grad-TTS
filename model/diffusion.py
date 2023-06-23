@@ -196,6 +196,7 @@ class GradLogPEstimator2d(BaseModule):
             x = downsample(x * mask_down)
             masks.append(mask_down[:, :, :, ::2])
 
+
         masks = masks[:-1]
         mask_mid = masks[-1]
         x = self.mid_block1(x, mask_mid, t)
@@ -212,6 +213,7 @@ class GradLogPEstimator2d(BaseModule):
 
         x = self.final_block(x, mask)
         output = self.final_conv(x * mask)
+
 
         return (output * mask).squeeze(1)
 

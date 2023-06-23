@@ -179,3 +179,48 @@ class GradTTS(BaseModule):
         prior_loss = prior_loss / (torch.sum(y_mask) * self.n_feats)
         
         return dur_loss, prior_loss, diff_loss
+
+
+    def score(self, x, x_lengths, y, y_lengths, spk):
+        """
+        Compute score for a text and speech sample, p(X|Y) estimate
+
+        currently x refers to text and y is audio
+        """
+
+        x, x_lengths, y, y_lengths = self.relocate_input([x, x_lengths, y, y_lengths])
+
+        if self.n_spks > 1:
+            # Get speaker embedding
+            spk = self.spk_emb(spk)
+        
+        # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
+        mu_x, logw, x_mask = self.encoder(x, x_lengths, spk)
+        y_max_length = y.shape[-1]
+
+        y_mask = sequence_mask(y_lengths, y_max_length).unsqueeze(1).to(x_mask)
+        attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
+
+        # Use MAS to find most likely alignment `attn` between text and mel-spectrogram
+        with torch.no_grad(): 
+            const = -0.5 * math.log(2 * math.pi) * self.n_feats
+            factor = -0.5 * torch.ones(mu_x.shape, dtype=mu_x.dtype, device=mu_x.device)
+            y_square = torch.matmul(factor.transpose(1, 2), y ** 2)
+            y_mu_double = torch.matmul(2.0 * (factor * mu_x).transpose(1, 2), y)
+            mu_square = torch.sum(factor * (mu_x ** 2), 1).unsqueeze(-1)
+            log_prior = y_square - y_mu_double + mu_square + const
+
+            attn = monotonic_align.maximum_path(log_prior, attn_mask.squeeze(1))
+            attn = attn.detach()
+
+        # Align encoded text with mel-spectrogram and get mu_y segment
+        mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
+        mu_y = mu_y.transpose(1, 2)
+
+        # get noise estimate
+        t = torch.zeros((1, 1), dtype=y.dtype, device=y.device,
+                       requires_grad=False)
+        noise_estimation = self.decoder.estimator(torch.unsqueeze(y, dim=0), y_mask, mu_y, t, spk) # t=0
+
+        return noise_estimation
+

@@ -25,6 +25,8 @@ sys.path.append('./hifi-gan/')
 from env import AttrDict
 from models import Generator as HiFiGAN
 
+import matplotlib.pyplot as plt
+
 
 HIFIGAN_CONFIG = './checkpts/hifigan-config.json'
 HIFIGAN_CHECKPT = './checkpts/hifigan.pt'
@@ -77,6 +79,12 @@ if __name__ == '__main__':
                                                    stoc=False, spk=spk, length_scale=0.91)
             t = (dt.datetime.now() - t).total_seconds()
             print(f'Grad-TTS RTF: {t * 22050 / (y_dec.shape[-1] * 256)}')
+
+            plt.imshow(y_dec[0].cpu())
+            plt.savefig(f'./out/mel_{i}')
+            plt.imshow(y_enc[0].cpu())
+            plt.savefig(f'./out/mu_{i}')
+            
 
             audio = (vocoder.forward(y_dec).cpu().squeeze().clamp(-1, 1).numpy() * 32768).astype(np.int16)
             
