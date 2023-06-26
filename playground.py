@@ -28,24 +28,52 @@ from models import Generator as HiFiGAN
 import matplotlib.pyplot as plt
 from data import TextMelDataset
 
+from likelihood import likelihood, sde_lib
 
-HIFIGAN_CONFIG = './checkpts/hifigan-config.json'
-HIFIGAN_CHECKPT = './checkpts/hifigan.pt'
+train_filelist_path = params.train_filelist_path
+valid_filelist_path = params.valid_filelist_path
+cmudict_path = params.cmudict_path
+add_blank = params.add_blank
+
+log_dir = params.log_dir
+n_epochs = params.n_epochs
+batch_size = params.batch_size
+out_size = params.out_size
+learning_rate = params.learning_rate
+random_seed = params.seed
+
+nsymbols = len(symbols) + 1 if add_blank else len(symbols)
+n_enc_channels = params.n_enc_channels
+filter_channels = params.filter_channels
+filter_channels_dp = params.filter_channels_dp
+n_enc_layers = params.n_enc_layers
+enc_kernel = params.enc_kernel
+enc_dropout = params.enc_dropout
+n_heads = params.n_heads
+window_size = params.window_size
+
+n_feats = params.n_feats
+n_fft = params.n_fft
+sample_rate = params.sample_rate
+hop_length = params.hop_length
+win_length = params.win_length
+f_min = params.f_min
+f_max = params.f_max
+
+dec_dim = params.dec_dim
+beta_min = params.beta_min
+beta_max = params.beta_max
+pe_scale = params.pe_scale
+
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--file', type=str, required=True, help='path to a file with texts to synthesize')
     parser.add_argument('-c', '--checkpoint', type=str, required=True, help='path to a checkpoint of Grad-TTS')
-    parser.add_argument('-t', '--timesteps', type=int, required=False, default=10, help='number of timesteps of reverse diffusion')
-    parser.add_argument('-s', '--speaker_id', type=int, required=False, default=None, help='speaker id for multispeaker model')
     args = parser.parse_args()
     
-    if not isinstance(args.speaker_id, type(None)):
-        assert params.n_spks > 1, "Ensure you set right number of speakers in `params.py`."
-        spk = torch.LongTensor([args.speaker_id]).cuda()
-    else:
-        spk = None
+
     
     print('Initializing Grad-TTS...')
     generator = GradTTS(len(symbols)+1, params.n_spks, params.spk_emb_dim,
@@ -56,28 +84,26 @@ if __name__ == '__main__':
     generator.load_state_dict(torch.load(args.checkpoint, map_location=lambda loc, storage: loc))
     _ = generator.cuda().eval()
     print(f'Number of parameters: {generator.nparams}')
+
+    score_model = generator.decoder.estimator
     
-    with open(args.file, 'r', encoding='utf-8') as f:
-        texts = [line.strip() for line in f.readlines()]
-    cmu = cmudict.CMUDict('./resources/cmu_dictionary')
     
-    print('comparing noise for different stuff')
-    with torch.no_grad():
+    # set up SDE (maybe done by gradtts already?)
 
-        dataset = TextMelDataset('/exp/exp4/acq22mc/Grad-TTS/text.txt', './resources/cmu_dictionary')
+    sde = sde_lib.subVPSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale)  
 
-        mel_spec = dataset.get_mel('/exp/exp4/acq22mc/Grad-TTS/out/cat_mat.wav')
-
-        plt.imshow(mel_spec)
-        plt.savefig(f'./out/mel_example')
-
-        for i, text in enumerate(texts):
-            print(f'Synthesizing {i} text...', end=' ')
-            x = torch.LongTensor(intersperse(text_to_sequence(text, dictionary=cmu), len(symbols))).cuda()[None]
-            x_lengths = torch.LongTensor([x.shape[-1]]).cuda()
-
-            score = generator.score(x, x_lengths, mel_spec, torch.LongTensor([mel_spec.shape[-1]]), spk)
-            
+    likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x)
             
 
-    print('Done. Check out `out` folder for samples.')
+    test_dataset = TextMelDataset(valid_filelist_path, cmudict_path, add_blank,
+                                  n_fft, n_feats, sample_rate, hop_length,
+                                  win_length, f_min, f_max)
+    
+    test_batch = test_dataset.sample_test_batch(size=params.test_size)
+    for item in test_batch:
+        speech =  item['y']
+        likelihood_fn(score_model, speech) 
+
+
+
+print('Done.')

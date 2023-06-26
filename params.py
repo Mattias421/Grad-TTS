@@ -10,9 +10,9 @@ from model.utils import fix_len_compatibility
 
 
 # data parameters
-train_filelist_path = 'resources/filelists/ljspeech/train.txt'
-valid_filelist_path = 'resources/filelists/ljspeech/valid.txt'
-test_filelist_path = 'resources/filelists/ljspeech/test.txt'
+train_filelist_path = 'resources/filelists/libri-tts/train.txt'
+valid_filelist_path = 'resources/filelists/libri-tts/valid.txt'
+test_filelist_path = 'resources/filelists/libri-tts/test.txt'
 cmudict_path = 'resources/cmu_dictionary'
 add_blank = True
 n_feats = 80
@@ -20,7 +20,7 @@ n_spks = 247  # 247 for Libri-TTS filelist and 1 for LJSpeech
 spk_emb_dim = 64
 n_feats = 80
 n_fft = 1024
-sample_rate = 22050
+sample_rate = 24000
 hop_length = 256
 win_length = 1024
 f_min = 0
@@ -50,4 +50,4 @@ batch_size = 16
 learning_rate = 1e-4
 seed = 37
 save_every = 1
-out_size = fix_len_compatibility(2*22050//256)
+out_size = fix_len_compatibility(2*24000//256)
