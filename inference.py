@@ -14,7 +14,7 @@ from scipy.io.wavfile import write
 
 import torch
 
-import params
+import params_tedlium as params
 from model import GradTTS
 from text import text_to_sequence, cmudict
 from text.symbols import symbols
@@ -76,7 +76,7 @@ if __name__ == '__main__':
             
             t = dt.datetime.now()
             y_enc, y_dec, attn = generator.forward(x, x_lengths, n_timesteps=args.timesteps, temperature=1.5,
-                                                   stoc=False, spk=spk, length_scale=0.91)
+                                                   stoc=False, spk=spk, length_scale=1)
             t = (dt.datetime.now() - t).total_seconds()
             print(f'Grad-TTS RTF: {t * 22050 / (y_dec.shape[-1] * 256)}')
 

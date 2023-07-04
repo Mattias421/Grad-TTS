@@ -181,11 +181,10 @@ class GradTTS(BaseModule):
         return dur_loss, prior_loss, diff_loss
 
 
-    def score(self, x, x_lengths, y, y_lengths, spk):
+    def get_score_model(self, x, x_lengths, y, y_lengths, spk=None):
         """
-        Compute score for a text and speech sample, p(X|Y) estimate
-
-        currently x refers to text and y is audio
+        Generate a score model for a given speech/text pair
+        x is text, y is speech here.
         """
 
         x, x_lengths, y, y_lengths = self.relocate_input([x, x_lengths, y, y_lengths])
@@ -213,14 +212,27 @@ class GradTTS(BaseModule):
             attn = monotonic_align.maximum_path(log_prior, attn_mask.squeeze(1))
             attn = attn.detach()
 
+
         # Align encoded text with mel-spectrogram and get mu_y segment
         mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
         mu_y = mu_y.transpose(1, 2)
 
-        # get noise estimate
-        t = torch.zeros((1, 1), dtype=y.dtype, device=y.device,
-                       requires_grad=False)
-        noise_estimation = self.decoder.estimator(torch.unsqueeze(y, dim=0), y_mask, mu_y, t, spk) # t=0
+        t = torch.zeros(y.shape[0], dtype=y.dtype, device=y.device,
+                        requires_grad=False)
+        
+        class ScoreModel(torch.nn.Module):
 
-        return noise_estimation
+            def __init__(self, estimator):
+                super().__init__()
+                self.y_mask = y_mask
+                self.mu_y = mu_y
+                self.spk = spk
+                self.estimator = estimator
 
+            def forward(self, x, t):
+                x_t = self.estimator(x=x, mask=self.y_mask, mu=self.mu_y, t=t, spk=self.spk)
+                return x_t
+
+
+
+        return ScoreModel(self.decoder.estimator), mu_y, spk

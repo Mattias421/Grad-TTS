@@ -93,10 +93,13 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
         vec_t = torch.ones(sample.shape[0], device=sample.device) * t
         drift = mutils.to_flattened_numpy(drift_fn(model, sample, vec_t))
         logp_grad = mutils.to_flattened_numpy(div_fn(model, sample, vec_t, epsilon))
+        print(drift)
         return np.concatenate([drift, logp_grad], axis=0)
 
       init = np.concatenate([mutils.to_flattened_numpy(data), np.zeros((shape[0],))], axis=0)
+      print('about to integrate')
       solution = integrate.solve_ivp(ode_func, (eps, sde.T), init, rtol=rtol, atol=atol, method=method)
+      print('Integrated')
       nfe = solution.nfev
       zp = solution.y[:, -1]
       z = mutils.from_flattened_numpy(zp[:-shape[0]], shape).to(data.device).type(torch.float32)

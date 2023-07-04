@@ -1,2 +1,1 @@
-The bun is in the oven
-The nun is in the coven
+Hello Wing, I am a text to speech model.

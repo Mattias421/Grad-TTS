@@ -26,7 +26,8 @@ from env import AttrDict
 from models import Generator as HiFiGAN
 
 import matplotlib.pyplot as plt
-from data import TextMelDataset
+from data import TextMelSpeakerDataset, TextMelSpeakerBatchCollate
+from torch.utils.data import DataLoader
 
 from likelihood import likelihood, sde_lib
 
@@ -86,23 +87,46 @@ if __name__ == '__main__':
     print(f'Number of parameters: {generator.nparams}')
 
     score_model = generator.decoder.estimator
+
+    
     
     
     # set up SDE (maybe done by gradtts already?)
-
-    sde = sde_lib.subVPSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale)  
-
-    likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x)
             
 
-    test_dataset = TextMelDataset(valid_filelist_path, cmudict_path, add_blank,
+    test_dataset = TextMelSpeakerDataset(valid_filelist_path, cmudict_path, add_blank,
                                   n_fft, n_feats, sample_rate, hop_length,
                                   win_length, f_min, f_max)
     
     test_batch = test_dataset.sample_test_batch(size=params.test_size)
-    for item in test_batch:
+    batch_collate = TextMelSpeakerBatchCollate()
+
+    loader = DataLoader(dataset=test_dataset, batch_size=1,
+                        collate_fn=batch_collate, drop_last=True,
+                        num_workers=8, shuffle=False)
+
+    for item in loader:
         speech =  item['y']
-        likelihood_fn(score_model, speech) 
+        text = item['x']
+        spk = item['spk']
+
+        x_lengths = item['x_lengths']
+        y_lengths = item['y_lengths']
+
+        score_model, mu, spk_emb = generator.get_score_model(text.cuda(), x_lengths.cuda(), speech.cuda(), y_lengths.cuda(), spk.cuda())
+        
+        sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb)  
+        # sde = sde_lib.VPSDE(beta_min=beta_min, beta_max=beta_max, N=50)  
+
+        likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x)
+
+        score_model = score_model.cuda()
+        speech = speech.cuda()
+
+        print('Calculating likelihood')
+
+        print(likelihood_fn(score_model, speech))
+        print('Thats a nice likelihood!')
 
 
 
