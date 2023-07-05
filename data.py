@@ -21,6 +21,7 @@ from params import seed as random_seed
 import sys
 sys.path.insert(0, 'hifi-gan')
 from librosa.filters import mel as librosa_mel_fn
+import os
 # from meldataset import mel_spectrogram
 
 # create spectrogram
@@ -246,3 +247,72 @@ class TextMelSpeakerBatchCollate(object):
         x_lengths = torch.LongTensor(x_lengths)
         spk = torch.cat(spk, dim=0)
         return {'x': x, 'x_lengths': x_lengths, 'y': y, 'y_lengths': y_lengths, 'spk': spk}
+    
+class TextMelZeroSpeakerDataset(torch.utils.data.Dataset):
+    """
+    Dataset that collects a pretrained speaker embedding 
+    File path only needs to contain wav path and text.
+    """
+    def __init__(self, filelist_path, cmudict_path, add_blank=True,
+                 n_fft=1024, n_mels=80, sample_rate=22050,
+                 hop_length=256, win_length=1024, f_min=0., f_max=8000):
+        super().__init__()
+        self.filelist = parse_filelist(filelist_path, split_char='|')
+        self.cmudict = cmudict.CMUDict(cmudict_path)
+        self.n_fft = n_fft
+        self.n_mels = n_mels
+        self.sample_rate = sample_rate
+        self.hop_length = hop_length
+        self.win_length = win_length
+        self.f_min = f_min
+        self.f_max = f_max
+        self.add_blank = add_blank
+        random.seed(random_seed)
+        random.shuffle(self.filelist)
+
+    def get_triplet(self, line):
+        filepath, text = line[0], line[1]
+        text = self.get_text(text, add_blank=self.add_blank)
+        mel = self.get_mel(filepath)
+        speaker = self.get_speaker(filepath)
+        return (text, mel, speaker)
+
+    def get_mel(self, filepath):
+        audio, sr = ta.load(filepath)
+        assert sr == self.sample_rate
+        mel = mel_spectrogram(audio, self.n_fft, self.n_mels, self.sample_rate, self.hop_length,
+                              self.win_length, self.f_min, self.f_max, center=False).squeeze()
+        return mel
+
+    def get_text(self, text, add_blank=True):
+        text_norm = text_to_sequence(text, dictionary=self.cmudict)
+        if self.add_blank:
+            text_norm = intersperse(text_norm, len(symbols))  # add a blank token, whose id number is len(symbols)
+        text_norm = torch.LongTensor(text_norm)
+        return text_norm
+
+    def get_speaker(self, speaker):
+        directory = os.path.dirname(speaker)
+        filename = os.path.basename(speaker)
+
+        modified_directory = directory.replace("wavs", "spk_embs")
+        modified_filename = os.path.splitext(filename)[0] + ".pt"
+
+        modified_path = os.path.join(modified_directory, modified_filename)
+        return torch.load(modified_path)
+
+    def __getitem__(self, index):
+        text, mel, speaker = self.get_triplet(self.filelist[index])
+        item = {'y': mel, 'x': text, 'spk': speaker}
+        return item
+
+    def __len__(self):
+        return len(self.filelist)
+
+    def sample_test_batch(self, size):
+        idx = np.random.choice(range(len(self)), size=size, replace=False)
+        test_batch = []
+        for index in idx:
+            test_batch.append(self.__getitem__(index))
+        return test_batch
+
