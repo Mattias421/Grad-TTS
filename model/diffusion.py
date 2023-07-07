@@ -136,7 +136,7 @@ class GradLogPEstimator2d(BaseModule):
         self.spk_emb_dim = spk_emb_dim
         self.pe_scale = pe_scale
         
-        if n_spks > 1:
+        if n_spks > 1 or n_spks == -1:
             self.spk_mlp = torch.nn.Sequential(torch.nn.Linear(spk_emb_dim, spk_emb_dim * 4), Mish(),
                                                torch.nn.Linear(spk_emb_dim * 4, n_feats))
         self.time_pos_emb = SinusoidalPosEmb(dim)

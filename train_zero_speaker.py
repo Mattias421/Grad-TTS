@@ -15,9 +15,11 @@ from torch.utils.tensorboard import SummaryWriter
 
 import params_tedlium as params # changed
 from model import GradTTS
-from data import TextMelZeroSpeakerDataset, TextMelSpeakerBatchCollate
+from data import TextMelZeroSpeakerDataset, TextMelZeroSpeakerBatchCollate
 from utils import plot_tensor, save_plot
 from text.symbols import symbols
+
+import time
 
 
 train_filelist_path = params.train_filelist_path
@@ -69,7 +71,7 @@ if __name__ == "__main__":
     train_dataset = TextMelZeroSpeakerDataset(train_filelist_path, cmudict_path, add_blank,
                                           n_fft, n_feats, sample_rate, hop_length,
                                           win_length, f_min, f_max)
-    batch_collate = TextMelSpeakerBatchCollate()
+    batch_collate = TextMelZeroSpeakerBatchCollate()
     loader = DataLoader(dataset=train_dataset, batch_size=batch_size,
                         collate_fn=batch_collate, drop_last=True,
                         num_workers=8, shuffle=True)
@@ -90,9 +92,8 @@ if __name__ == "__main__":
 
     print('Logging test batch...')
     test_batch = test_dataset.sample_test_batch(size=params.test_size)
-    for item in test_batch:
+    for i, item in enumerate(test_batch):
         mel, spk = item['y'], item['spk']
-        i = int(spk.cpu())
         logger.add_image(f'image_{i}/ground_truth', plot_tensor(mel.squeeze()),
                          global_step=0, dataformats='HWC')
         save_plot(mel.squeeze(), f'{log_dir}/original_{i}.png')
@@ -103,11 +104,10 @@ if __name__ == "__main__":
         model.eval()
         print('Synthesis...')
         with torch.no_grad():
-            for item in test_batch:
+            for i, item in enumerate(test_batch):
                 x = item['x'].to(torch.long).unsqueeze(0).cuda()
                 x_lengths = torch.LongTensor([x.shape[-1]]).cuda()
-                spk = item['spk'].to(torch.long).cuda()
-                i = int(spk.cpu())
+                spk = item['spk'].cuda()
                 
                 y_enc, y_dec, attn = model(x, x_lengths, n_timesteps=50, spk=spk)
                 logger.add_image(f'image_{i}/generated_enc',

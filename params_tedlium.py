@@ -10,14 +10,14 @@ from model.utils import fix_len_compatibility
 
 
 # data parameters
-train_filelist_path = 'file_list.txt'
-valid_filelist_path = 'file_list.txt'
-test_filelist_path = 'file_list.txt'
+train_filelist_path = 'train' # tedlium corpus doesn't use filelist
+valid_filelist_path = 'dev'
+test_filelist_path = 'test'
 cmudict_path = 'resources/cmu_dictionary'
 add_blank = True
 n_feats = 80
-n_spks = 2028  # 247 for Libri-TTS filelist and 1 for LJSpeech
-spk_emb_dim = 192
+n_spks = -1  # cheat code to unlock pre-trained speaker embeddings
+spk_emb_dim = 192 # speaker encoder dim
 n_feats = 80
 n_fft = 1024
 sample_rate = 16000
@@ -43,10 +43,10 @@ beta_max = 20.0
 pe_scale = 1000  # 1 for `grad-tts-old.pt` checkpoint
 
 # training parameters
-log_dir = './logs/tedlium'
+log_dir = '../logs/tedlium-1'
 test_size = 4
-n_epochs = 10000
-batch_size = 32
+n_epochs = 50
+batch_size = 16
 learning_rate = 1e-4
 seed = 1
 save_every = 1

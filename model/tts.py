@@ -40,8 +40,12 @@ class GradTTS(BaseModule):
         self.beta_max = beta_max
         self.pe_scale = pe_scale
 
-        if n_spks > 1:
+        if self.n_spks == -1:
+            self.spk_emb = None
+        elif self.n_spks > 1:
+            # Get speaker embedding
             self.spk_emb = torch.nn.Embedding(n_spks, spk_emb_dim)
+
         self.encoder = TextEncoder(n_vocab, n_feats, n_enc_channels, 
                                    filter_channels, filter_channels_dp, n_heads, 
                                    n_enc_layers, enc_kernel, enc_dropout, window_size)
@@ -67,9 +71,14 @@ class GradTTS(BaseModule):
         """
         x, x_lengths = self.relocate_input([x, x_lengths])
 
-        if self.n_spks > 1:
+        if self.n_spks == -1:
+                    spk = spk
+
+        elif self.n_spks > 1:
             # Get speaker embedding
             spk = self.spk_emb(spk)
+
+        
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spk)
@@ -115,7 +124,11 @@ class GradTTS(BaseModule):
         """
         x, x_lengths, y, y_lengths = self.relocate_input([x, x_lengths, y, y_lengths])
 
-        if self.n_spks > 1:
+        if self.n_spks == -1:
+            # use pretrained speaker embedding
+            spk = spk
+
+        elif self.n_spks > 1:
             # Get speaker embedding
             spk = self.spk_emb(spk)
         
@@ -189,10 +202,13 @@ class GradTTS(BaseModule):
 
         x, x_lengths, y, y_lengths = self.relocate_input([x, x_lengths, y, y_lengths])
 
-        if self.n_spks > 1:
+        if self.n_spks == -1:
+                            spk = spk
+        elif self.n_spks > 1:
             # Get speaker embedding
             spk = self.spk_emb(spk)
         
+      
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spk)
         y_max_length = y.shape[-1]
