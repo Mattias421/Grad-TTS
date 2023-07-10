@@ -38,7 +38,9 @@ def load_corpus(
 for split in ['train', 'dev', 'test']:
     corpus = load_corpus()[split]
     
-    # with open(f'../resources/filelists/tedlium/{split}.txt'):
-    for i in corpus:
-        print(i.recording.sources[0].source)
-        print(i.supervisions[0].text)
+    with open(f'../resources/filelists/tedlium/{split}.txt', 'w') as f:
+        for i in corpus:
+            path = i.recording.sources[0].source
+            text = i.supervisions[0].text
+            f.write(f'{path}|{text}\n')
+

@@ -35,6 +35,16 @@ classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-ecapa-vox
 HIFIGAN_CONFIG = './checkpts/hifigan-config.json'
 HIFIGAN_CHECKPT = './checkpts/hifigan.pt'
 
+def pt_to_pdf(pt,pdf,vmin=-12.5,vmax=0.0, extension='png'):
+  """ plot spectrogram """
+  spec=pt.t()
+  fig=plt.figure(figsize=(12,3),tight_layout=True) #(20,4)
+  subfig=fig.add_subplot()
+  image=subfig.imshow(spec,cmap="jet",origin="lower",aspect="equal",interpolation="none",vmax=vmax,vmin=vmin)
+  fig.colorbar(mappable=image,orientation='vertical',ax=subfig,shrink=0.5)
+  plt.savefig(f'{pdf}.{extension}',format=extension)
+  plt.close()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -83,10 +93,8 @@ if __name__ == '__main__':
             t = (dt.datetime.now() - t).total_seconds()
             print(f'Grad-TTS RTF: {t * 22050 / (y_dec.shape[-1] * 256)}')
 
-            plt.imshow(y_dec[0].cpu())
-            plt.savefig(f'./out/mel_{i}')
-            plt.imshow(y_enc[0].cpu())
-            plt.savefig(f'./out/mu_{i}')
+            pt_to_pdf(y_dec[0].cpu().T, f'./out/mel_{i}')
+            pt_to_pdf(y_enc[0].cpu().T, f'./out/mu_{i}')
             
 
             audio = (vocoder.forward(y_dec).cpu().squeeze().clamp(-1, 1).numpy() * 32768).astype(np.int16)

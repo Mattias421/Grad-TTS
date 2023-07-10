@@ -13,6 +13,7 @@ from model.utils import fix_len_compatibility
 train_filelist_path = 'resources/filelists/libri-tts/train.txt'
 valid_filelist_path = 'resources/filelists/libri-tts/valid.txt'
 test_filelist_path = 'resources/filelists/libri-tts/test.txt'
+
 cmudict_path = 'resources/cmu_dictionary'
 add_blank = True
 n_feats = 80

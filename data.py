@@ -292,13 +292,13 @@ class TextMelZeroSpeakerDataset(torch.utils.data.Dataset):
     File path only needs to contain wav path and text.
     Made specifically for tedlium-1
     """
-    def __init__(self, split, cmudict_path, add_blank=True,
+    def __init__(self, filelist_path, spk_path, cmudict_path, add_blank=True,
                  n_fft=1024, n_mels=80, sample_rate=22050,
                  hop_length=256, win_length=1024, f_min=0., f_max=8000, spk_emb_dim=192):
         super().__init__()
 
-        self.corpus = load_corpus(transform=False)[split] # corpus instead of filelist
-        self.spk_emb = torch.load(f'/store/store4/data/TEDLIUM_release1/tedlium/spk_emb/{split}.pt')
+        self.filepaths_and_text = parse_filelist(filelist_path)
+        self.spk_emb = torch.load(spk_path)
 
         self.cmudict = cmudict.CMUDict(cmudict_path)
         self.n_fft = n_fft
@@ -311,18 +311,19 @@ class TextMelZeroSpeakerDataset(torch.utils.data.Dataset):
         self.add_blank = add_blank
         random.seed(random_seed)
 
-        self.split = split
         self.spk_emb_dim = spk_emb_dim
 
     def get_triplet(self, index):
-        item = self.corpus[index]
-        text = self.get_text(item.supervisions[0].text, add_blank=self.add_blank)
-        mel = self.get_mel(item)
+        filepath_and_text = self.filepaths_and_text[index]
+        filepath, text = filepath_and_text[0], filepath_and_text[1]
+        text = self.get_text(text, add_blank=self.add_blank)
+        mel = self.get_mel(filepath)
         speaker = self.spk_emb[index]
         return (text, mel, speaker)
 
-    def get_mel(self, item):
-        audio = torch.FloatTensor(item.load_audio())
+    def get_mel(self, filepath):
+        audio, sr = ta.load(filepath)
+        assert sr == self.sample_rate
         mel = mel_spectrogram(audio, self.n_fft, self.n_mels, self.sample_rate, self.hop_length,
                               self.win_length, self.f_min, self.f_max, center=False).squeeze()
         return mel
@@ -340,7 +341,7 @@ class TextMelZeroSpeakerDataset(torch.utils.data.Dataset):
             return item
 
     def __len__(self):
-        return len(self.corpus)
+        return len(self.filepaths_and_text)
 
     def sample_test_batch(self, size):
         idx = np.random.choice(range(len(self)), size=size, replace=False)

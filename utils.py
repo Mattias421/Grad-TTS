@@ -50,11 +50,20 @@ def save_figure_to_numpy(fig):
     data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     return data
 
+def pt_to_pdf(pt,pdf,vmin=-12.5,vmax=0.0, extension='png'):
+  """ plot spectrogram """
+  spec=pt.t()
+  fig=plt.figure(figsize=(12,3),tight_layout=True) #(20,4)
+  subfig=fig.add_subplot()
+  image=subfig.imshow(spec,cmap="jet",origin="lower",aspect="equal",interpolation="none",vmax=vmax,vmin=vmin)
+  fig.colorbar(mappable=image,orientation='vertical',ax=subfig,shrink=0.5)
+  plt.savefig(f'{pdf}.{extension}',format=extension)
+  plt.close()
 
 def plot_tensor(tensor):
     plt.style.use('default')
     fig, ax = plt.subplots(figsize=(12, 3))
-    im = ax.imshow(tensor, aspect="auto", origin="lower", interpolation='none')
+    im = ax.imshow(tensor.T, cmap='jet', aspect="equal", origin="lower", interpolation='none')
     plt.colorbar(im, ax=ax)
     plt.tight_layout()
     fig.canvas.draw()
@@ -66,7 +75,7 @@ def plot_tensor(tensor):
 def save_plot(tensor, savepath):
     plt.style.use('default')
     fig, ax = plt.subplots(figsize=(12, 3))
-    im = ax.imshow(tensor, aspect="auto", origin="lower", interpolation='none')
+    im = ax.imshow(tensor, cmap='jet', aspect="equal", origin="lower", interpolation='none')
     plt.colorbar(im, ax=ax)
     plt.tight_layout()
     fig.canvas.draw()
