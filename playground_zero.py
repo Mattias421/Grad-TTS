@@ -14,7 +14,7 @@ from scipy.io.wavfile import write
 
 import torch
 
-import params
+import params_tedlium as params
 from model import GradTTS
 from text import text_to_sequence, cmudict
 from text.symbols import symbols
@@ -26,7 +26,7 @@ from env import AttrDict
 from models import Generator as HiFiGAN
 
 import matplotlib.pyplot as plt
-from data import TextMelSpeakerDataset, TextMelSpeakerBatchCollate
+from data import TextMelZeroSpeakerDataset, TextMelZeroSpeakerBatchCollate
 from torch.utils.data import DataLoader
 
 from likelihood import likelihood, sde_lib
@@ -36,6 +36,7 @@ valid_filelist_path = params.valid_filelist_path
 cmudict_path = params.cmudict_path
 add_blank = params.add_blank
 
+valid_spk = params.valid_spk
 
 log_dir = params.log_dir
 n_epochs = params.n_epochs
@@ -92,14 +93,15 @@ if __name__ == '__main__':
     
     
     
+    # set up SDE (maybe done by gradtts already?)
             
 
-    test_dataset = TextMelSpeakerDataset(valid_filelist_path, cmudict_path, add_blank,
+    test_dataset = TextMelZeroSpeakerDataset(valid_filelist_path, valid_spk, cmudict_path, add_blank,
                                   n_fft, n_feats, sample_rate, hop_length,
                                   win_length, f_min, f_max)
     
     test_batch = test_dataset.sample_test_batch(size=params.test_size)
-    batch_collate = TextMelSpeakerBatchCollate()
+    batch_collate = TextMelZeroSpeakerBatchCollate()
 
     loader = DataLoader(dataset=test_dataset, batch_size=1,
                         collate_fn=batch_collate, drop_last=True,
@@ -110,12 +112,8 @@ if __name__ == '__main__':
         text = item['x']
         spk = item['spk']
 
-        # text = torch.rand_like(text.to(torch.float32)).to(torch.long)
-
         x_lengths = item['x_lengths']
         y_lengths = item['y_lengths']
-
-        generator.forward(text.cuda(), x_lengths.cuda(), n_timesteps=52, spk=spk.cuda())
 
         score_model, mu, spk_emb = generator.get_score_model(text.cuda(), x_lengths.cuda(), speech.cuda(), y_lengths.cuda(), spk.cuda())
         
@@ -128,12 +126,9 @@ if __name__ == '__main__':
         score_model = score_model.cuda()
         speech = speech.cuda()
 
-        print('speech is ', speech)
-        print('with shape ', speech.shape)
-
         print('Calculating likelihood')
 
-        print(likelihood_fn(score_model, speech)[0], 'bpd')
+        print(likelihood_fn(score_model, speech))
         print('Thats a nice likelihood!')
 
 

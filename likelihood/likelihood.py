@@ -22,6 +22,7 @@ import numpy as np
 from scipy import integrate
 from likelihood import utils_sde as mutils
 
+import matplotlib.pyplot as plt
 
 def get_div_fn(fn):
   """Create the divergence function of `fn` using the Hutchinson-Skilling trace estimator."""
@@ -58,9 +59,10 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
 
   def drift_fn(model, x, t):
     """The drift function of the reverse-time SDE."""
-    score_fn = mutils.get_score_fn(sde, model, train=False, continuous=True)
+    # score_fn = mutils.get_score_fn(sde, model, train=False, continuous=True) # score function is not used
     # Probability flow ODE is a special case of Reverse SDE
-    rsde = sde.reverse(score_fn, probability_flow=True)
+    return 0.5 * (sde.mu - x - model(x, t)) * (sde.sde(x, t)[1] ** 2)
+    rsde = sde.reverse(model, probability_flow=True)
     return rsde.sde(x, t)[0]
 
   def div_fn(model, x, t, noise):
@@ -88,23 +90,101 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
       else:
         raise NotImplementedError(f"Hutchinson type {hutchinson_type} unknown.")
 
+      ode_deltas = []
+      ode_t = []
       def ode_func(t, x):
         sample = mutils.from_flattened_numpy(x[:-shape[0]], shape).to(data.device).type(torch.float32)
         vec_t = torch.ones(sample.shape[0], device=sample.device) * t
         drift = mutils.to_flattened_numpy(drift_fn(model, sample, vec_t))
         logp_grad = mutils.to_flattened_numpy(div_fn(model, sample, vec_t, epsilon))
-        print(drift)
+        # print(drift)
+        # print(sample)
+        # print(logp_grad, t)
+        ode_deltas.append(logp_grad)
+        ode_t.append(t)
+        plt.imshow(sample.cpu().squeeze())
+        plt.title(str(t))
+        plt.savefig(f'../delta_plots/libritts_ode_sampler/{int(t*100)}.png')
         return np.concatenate([drift, logp_grad], axis=0)
+      
 
+
+
+      def trapezoidal_integral(time_steps, y_values):
+        if len(time_steps) != len(y_values):
+            raise ValueError("The number of time steps and y values must be the same.")
+
+        integral = 0.0
+        for i in range(1, len(time_steps)):
+            dt = time_steps[i] - time_steps[i - 1]
+            integral += 0.5 * (y_values[i] + y_values[i - 1]) * dt
+
+        return integral
+      
+      its = [52]
+      for num_its in its:
+        ode_deltas = []
+        ode_t = []
+        # debugging
+        plt.imshow(data.cpu().squeeze())
+        plt.title('Original')
+        plt.savefig('../delta_plots/libritts_ode_sampler/original.png')
+        data = torch.rand_like(data) + sde.mu # X_T for reverse mode
+        init = np.concatenate([mutils.to_flattened_numpy(data), np.zeros((shape[0],))], axis=0)
+        x = data
+        h = 1 / num_its # step size
+        for i in range(num_its):
+          t = (1 - (i + 0.5)*h)
+          vec_t = torch.ones(x.shape[0], device=x.device) * t
+          noise_t = sde.sde(x, vec_t.unsqueeze(-1).unsqueeze(-1))[1] ** 2
+          dxt = 0.5 * (sde.mu - x - model(x, vec_t))
+          dxt = dxt * noise_t * h
+
+          x = x - dxt
+          print(x)
+
+          plt.imshow(x.cpu().squeeze())
+          plt.title(str(t))
+          plt.savefig(f'../delta_plots/libritts_ode_sampler/{i}.png')
+
+          # x = x - (ode_func(t, x) * h)
+        plt.clf()
+        plt.scatter(ode_t, ode_deltas)
+        plt.xlabel('t')
+        plt.ylabel('logp_grad')
+        plt.title(f'Speech at {num_its} iterations')
+        plt.savefig(f'../delta_plots/speech_{num_its}.png')
+
+      return 0
+
+
+      # sample
+
+      rand_data = torch.rand_like(data) + sde.mu # X_T for reverse mode
+      init = np.concatenate([mutils.to_flattened_numpy(rand_data), np.zeros((shape[0],))], axis=0)
+
+      solution = integrate.solve_ivp(ode_func, (sde.T, eps), init, rtol=rtol, atol=atol, method=method)
+      x_0 = solution.y[:, -1][:-shape[0]].reshape(shape)
+      plt.imshow(x_0[0])
+      plt.savefig('ode_sample.png')
+      # find likelihood
       init = np.concatenate([mutils.to_flattened_numpy(data), np.zeros((shape[0],))], axis=0)
+      ode_deltas = []
+      ode_t = []
       print('about to integrate')
       solution = integrate.solve_ivp(ode_func, (eps, sde.T), init, rtol=rtol, atol=atol, method=method)
+      plt.clf()
+      plt.scatter(ode_t[1:], ode_deltas[1:])
+      plt.savefig(f'../delta_plots/speech_rk45.png')
+      ode_deltas = []
       print('Integrated')
+      print(solution)
       nfe = solution.nfev
       zp = solution.y[:, -1]
       z = mutils.from_flattened_numpy(zp[:-shape[0]], shape).to(data.device).type(torch.float32)
       delta_logp = mutils.from_flattened_numpy(zp[-shape[0]:], (shape[0],)).to(data.device).type(torch.float32)
       prior_logp = sde.prior_logp(z)
+      print(prior_logp)
       bpd = -(prior_logp + delta_logp) / np.log(2)
       N = np.prod(shape[1:])
       bpd = bpd / N

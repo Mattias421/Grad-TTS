@@ -276,7 +276,7 @@ class SPEECHSDE(VPSDE):
   
   def sde(self, x, t):
     beta_t = self.beta_0 + t * (self.beta_1 - self.beta_0)
-    drift = (-0.5 * beta_t[:, None, None, None] * (self.mu - x)) 
+    drift = (0.5 * beta_t * (self.mu - x)) 
     diffusion = torch.sqrt(beta_t)
     return drift, diffusion
   
@@ -292,45 +292,9 @@ class SPEECHSDE(VPSDE):
   def prior_logp(self, z):
     shape = z.shape
     N = np.prod(shape[1:])
-    logps = -N / 2. * np.log(2 * np.pi) - torch.sum((z - self.mu) ** 2, dim=(1, 2, 3)) / 2.
+    print(z.shape)
+    print(self.mu.shape)
+    logps = -N / 2. * np.log(2 * np.pi) - torch.sum((z - self.mu) ** 2, dim=(1, 2)) / 2.
     return logps
 
-  def reverse(self, score_fn, probability_flow=False):
-    """Create the reverse-time SDE/ODE.
-
-    Args:
-      score_fn: A time-dependent score-based model that takes x and t and returns the score.
-      probability_flow: If `True`, create the reverse-time ODE used for probability flow sampling.
-    """
-    N = self.N
-    T = self.T
-    sde_fn = self.sde
-    discretize_fn = self.discretize
-
-    # Build the class for reverse-time SDE.
-    class RSDE(self.__class__):
-      def __init__(self):
-        self.N = N
-        self.probability_flow = probability_flow
-
-      @property
-      def T(self):
-        return T
-
-      def sde(self, x, t):
-        """Create the drift and diffusion functions for the reverse SDE/ODE."""
-        drift, diffusion = sde_fn(x, t)
-        score = score_fn(x, t)
-        drift = drift - diffusion[:, None, None, None] ** 2 * score * (1 if self.probability_flow else 1.) # should multiply by 0.5 or no?
-        # Set the diffusion function to zero for ODEs.
-        diffusion = 0. if self.probability_flow else diffusion
-        return drift, diffusion
-
-      def discretize(self, x, t):
-        """Create discretized iteration rules for the reverse diffusion sampler."""
-        f, G = discretize_fn(x, t)
-        rev_f = f - (G[:, None, None, None] ** 2 * (self.mu - f) * (0.5 if self.probability_flow else 1.) - G[:, None, None, None] ** 2 * score_fn(x, t))
-        rev_G = torch.zeros_like(G) if self.probability_flow else G
-        return rev_f, rev_G
-
-    return RSDE()
+  

@@ -45,7 +45,7 @@ pe_scale = 1000  # 1 for `grad-tts-old.pt` checkpoint
 
 # training parameters
 log_dir = 'logs/new_exp'
-test_size = 4
+test_size = 1
 n_epochs = 10000
 batch_size = 16
 learning_rate = 1e-4

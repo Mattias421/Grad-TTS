@@ -14,7 +14,7 @@ from scipy.io.wavfile import write
 
 import torch
 
-import params_tedlium as params
+import params
 from model import GradTTS
 from text import text_to_sequence, cmudict
 from text.symbols import symbols
@@ -67,7 +67,6 @@ if __name__ == '__main__':
     with open(args.file, 'r', encoding='utf-8') as f:
         texts = [line.strip() for line in f.readlines()]
     cmu = cmudict.CMUDict('./resources/cmu_dictionary')
-    
     with torch.no_grad():
         for i, text in enumerate(texts):
             print(f'Synthesizing {i} text...', end=' ')
