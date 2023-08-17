@@ -209,7 +209,6 @@ class GradLogPEstimator2d(BaseModule):
             x = resnet2(x, mask_up, t)
             x = attn(x)
             x = upsample(x * mask_up)
-
         x = self.final_block(x, mask)
         output = self.final_conv(x * mask)
 
@@ -262,21 +261,14 @@ class Diffusion(BaseModule):
             time = t.unsqueeze(-1).unsqueeze(-1)
             noise_t = get_noise(time, self.beta_min, self.beta_max, 
                                 cumulative=False)
-            if stoc:  # adds stochastic term
-                dxt_det = 0.5 * (mu - xt) - self.estimator(xt, mask, mu, t, spk)
-                dxt_det = dxt_det * noise_t * h
-                dxt_stoc = torch.randn(z.shape, dtype=z.dtype, device=z.device,
-                                       requires_grad=False)
-                dxt_stoc = dxt_stoc * torch.sqrt(noise_t * h)
-                dxt = dxt_det + dxt_stoc
-            else:
-                dxt = 0.5 * (mu - xt - self.estimator(xt, mask, mu, t, spk))
-                dxt = dxt * noise_t * h
+            
+            dxt = 0.5 * (mu - xt - self.estimator(xt, mask, mu, t, spk))
+            dxt = dxt * noise_t * h
             xt = (xt - dxt) * mask
             import matplotlib.pyplot as plt
             plt.imshow(xt.cpu().squeeze())
             plt.title(str(t))
-            plt.savefig(f'../delta_plots/libritts_tts_sampler/{i}.png')
+            plt.savefig(f'../delta_plots/libritts_tts_sampler_orig/{i}.png')
         return xt
 
     @torch.no_grad()

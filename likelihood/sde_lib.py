@@ -254,7 +254,7 @@ class VESDE(SDE):
     return f, G
 
 class SPEECHSDE(VPSDE):
-  def __init__(self, beta_min, beta_max, N, mu, spk):
+  def __init__(self, beta_min, beta_max, N, mu, spk, mask):
     """Make a Grad-tts sde for a given text (mean) and speaker (spk)
     inherets VPSDE"""
     super().__init__(N) 
@@ -269,6 +269,7 @@ class SPEECHSDE(VPSDE):
 
     self.mu = mu
     self.speaker = spk
+    self.mask = mask
 
   @property
   def T(self):
@@ -292,8 +293,6 @@ class SPEECHSDE(VPSDE):
   def prior_logp(self, z):
     shape = z.shape
     N = np.prod(shape[1:])
-    print(z.shape)
-    print(self.mu.shape)
     logps = -N / 2. * np.log(2 * np.pi) - torch.sum((z - self.mu) ** 2, dim=(1, 2)) / 2.
     return logps
 

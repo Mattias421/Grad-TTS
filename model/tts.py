@@ -233,8 +233,48 @@ class GradTTS(BaseModule):
         mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
         mu_y = mu_y.transpose(1, 2)
 
-        t = torch.zeros(y.shape[0], dtype=y.dtype, device=y.device,
-                        requires_grad=False)
+        # x, x_lengths, y, speech_lengths = self.relocate_input([x, x_lengths, y, y_lengths])
+
+        # if self.n_spks == -1:
+        #             spk = spk
+
+        # elif self.n_spks > 1:
+        #     # Get speaker embedding
+        #     spk = self.spk_emb(spk)
+
+        # # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
+        # mu_x, logw, x_mask = self.encoder(x, x_lengths, spk)
+
+        # w = torch.exp(logw) * x_mask
+        # w_ceil = torch.ceil(w)
+        # y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1).long()
+        # y_max_length = int(y_lengths.max())
+        # y_max_length_ = fix_len_compatibility(y_max_length)
+
+        # # Using obtained durations `w` construct alignment map `attn`
+        # y_mask = sequence_mask(y_lengths, y_max_length_).unsqueeze(1).to(x_mask.dtype)
+        # attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
+        # attn = generate_path(w_ceil.squeeze(1), attn_mask.squeeze(1)).unsqueeze(1)
+
+        # # Align encoded text and get mu_y
+        # mu_y = torch.matmul(attn.squeeze(1).transpose(1, 2), mu_x.transpose(1, 2))
+        # mu_y = mu_y.transpose(1, 2)
+
+
+        # # trim or pad
+        # from torch.nn.functional import pad 
+
+        # speech_length = y.size(2)
+
+        # if mu_y.size(2) < speech_length:
+        #     mu_y = pad(mu_y, (0, speech_length - mu_y.size(2)))
+        #     y_mask = pad(y_mask, (0, speech_length - y_mask.size(2)), value=0)
+        # else:
+        #     mu_y = mu_y[:, :, :(speech_length)]
+        #     y_mask = y_mask[:, :, :(speech_length)]
+
+
+
         
         class ScoreModel(torch.nn.Module):
 
@@ -251,4 +291,4 @@ class GradTTS(BaseModule):
 
 
 
-        return ScoreModel(self.decoder.estimator), mu_y, spk
+        return ScoreModel(self.decoder.estimator), mu_y, spk, y_mask

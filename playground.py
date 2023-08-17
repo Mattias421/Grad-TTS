@@ -29,6 +29,9 @@ import matplotlib.pyplot as plt
 from data import TextMelSpeakerDataset, TextMelSpeakerBatchCollate
 from torch.utils.data import DataLoader
 
+
+from text import text_to_sequence, cmudict
+
 from likelihood import likelihood, sde_lib
 
 train_filelist_path = params.train_filelist_path
@@ -90,7 +93,7 @@ if __name__ == '__main__':
     score_model = generator.decoder.estimator
 
     
-    
+    cmu = cmudict.CMUDict('./resources/cmu_dictionary')
     
             
 
@@ -106,34 +109,60 @@ if __name__ == '__main__':
                         num_workers=8, shuffle=False)
 
     for item in loader:
-        speech =  item['y']
-        text = item['x']
-        spk = item['spk']
+        speech =  item['y'].cuda()
+        text = item['x'].cuda()
+        spk = item['spk'].cuda()
+        x_lengths = item['x_lengths'].cuda()
+        y_lengths = item['y_lengths'].cuda()
 
-        # text = torch.rand_like(text.to(torch.float32)).to(torch.long)
 
-        x_lengths = item['x_lengths']
-        y_lengths = item['y_lengths']
+        # noisy_text = "The thought of poor dead Annie Coulson flashed into Philip's mind."
+        # noisy_text = 'That is the kind of hold that curiosity has on the monkeys.'
+        # noisy_text = 'I was at this time knitting a pair of white cotton stockings for my mistress; and had not yet wrought upon a Sabbath day.'
+        # noisy_text = ' and had not yet listen to black Sabbath today.I was eating a pair of black cotton stockings stockings;'
+        noisy_text = 'How much wood would a wood chuck chuck if a wood chuck would chuck wood?'
+        # noisy_text = 'hi'
+        text = torch.LongTensor(intersperse(text_to_sequence(noisy_text, dictionary=cmu), len(symbols))).cuda()[None]
+        x_lengths = torch.LongTensor([text.shape[-1]]).cuda()
 
-        generator.forward(text.cuda(), x_lengths.cuda(), n_timesteps=52, spk=spk.cuda())
+        # text = torch.randn_like(text.to(torch.float32)).to(torch.long)
+        # speech = torch.randn_like(speech)
 
-        score_model, mu, spk_emb = generator.get_score_model(text.cuda(), x_lengths.cuda(), speech.cuda(), y_lengths.cuda(), spk.cuda())
+
+        score_model, mu, spk_emb, mask = generator.get_score_model(text.cuda(), x_lengths.cuda(), speech.cuda(), y_lengths.cuda(), spk.cuda())
+        sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb, mask=mask)  
+
+        # n_timesteps = 10
+        # h = 1.0 / n_timesteps
+        # z = mu + torch.randn_like(mu)
+        # xt = z * mask
+        # for i in range(n_timesteps):
+        #     t = (1.0 - (i + 0.5)*h) * torch.ones(z.shape[0], dtype=z.dtype, 
+        #                                          device=z.device)
+        #     time = t.unsqueeze(-1).unsqueeze(-1)
+            
+        #     noise_t = beta_min + (beta_max - beta_min) * time
+            
+        #     dxt = 0.5 * (mu - xt - score_model(xt, t))
+        #     dxt = dxt * noise_t * h
+        #     xt = (xt - dxt) * mask
+        #     import matplotlib.pyplot as plt
+        #     plt.imshow(xt.detach().cpu().squeeze())
+        #     plt.title(str(t))
+        #     plt.savefig(f'../delta_plots/libritts_tts_sampler/{i}.png')
+
         
-        sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb)  
-        # sde = sde_lib.VPSDE(beta_min=beta_min, beta_max=beta_max, N=50)  
+        # # generator.decoder.reverse_diffusion(z.cuda(), mask, mu, n_timesteps, stoc=False, spk=generator.spk_emb(spk.cuda()))
+        # generator(text, x_lengths, n_timesteps, spk=spk)
 
         likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x)
 
 
         score_model = score_model.cuda()
-        speech = speech.cuda()
-
-        print('speech is ', speech)
-        print('with shape ', speech.shape)
 
         print('Calculating likelihood')
 
-        print(likelihood_fn(score_model, speech)[0], 'bpd')
+        print('\n', likelihood_fn(score_model, speech), 'NLL')
         print('Thats a nice likelihood!')
 
 
