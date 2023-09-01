@@ -267,10 +267,10 @@ class SPEECHSDE(VPSDE):
     self.sqrt_alphas_cumprod = torch.sqrt(self.alphas_cumprod)
     self.sqrt_1m_alphas_cumprod = torch.sqrt(1. - self.alphas_cumprod)
 
-    self.mu = mu
     self.speaker = spk
     self.mask = mask
-
+    self.mu = mu 
+  
   @property
   def T(self):
     return 1
@@ -287,7 +287,7 @@ class SPEECHSDE(VPSDE):
     std = torch.sqrt(1. - torch.exp(2. * log_mean_coeff))
     return mean, std
   
-  def prior_sampling(self, shape):
+  def prior_sampling(self):
     return self.mu + torch.randn_like(self.mu)
   
   def prior_logp(self, z):
@@ -295,5 +295,13 @@ class SPEECHSDE(VPSDE):
     N = np.prod(shape[1:])
     logps = -N / 2. * np.log(2 * np.pi) - torch.sum((z - self.mu) ** 2, dim=(1, 2)) / 2.
     return logps
+  
+  # def prior_logp(self, z):
+  #   shape = z.shape
+  #   N = np.prod(shape[1:])
+  #   std = 1.1
+  #   logps = -N / 2. * np.log(2 * np.pi * std ** 2) - torch.sum((z - self.mu) ** 2, dim=(1, 2)) / (2 * std ** 2)
+  #   return logps
+
 
   

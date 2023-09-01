@@ -265,10 +265,6 @@ class Diffusion(BaseModule):
             dxt = 0.5 * (mu - xt - self.estimator(xt, mask, mu, t, spk))
             dxt = dxt * noise_t * h
             xt = (xt - dxt) * mask
-            import matplotlib.pyplot as plt
-            plt.imshow(xt.cpu().squeeze())
-            plt.title(str(t))
-            plt.savefig(f'../delta_plots/libritts_tts_sampler_orig/{i}.png')
         return xt
 
     @torch.no_grad()

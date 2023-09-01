@@ -167,43 +167,66 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
         logpx0 = area + sde.prior_logp(sample).item()
         print('logpx0 ', area + sde.prior_logp(sample).item())
 
-        print(np.exp(-logpx0))
-        return logpx0
+        return logpx0 / np.log(2) / np.prod(shape[1:])
 
 
+      # print(forward(data, 50), 'bpd')
       
       # return forward(data, 50)
 
       # sample
+      def ode_sample():
+        rand_data = sde.prior_sampling() # X_T for reverse mode
+        init = np.concatenate([mutils.to_flattened_numpy(rand_data), np.zeros((shape[0],))], axis=0)
 
-      # rand_data = (torch.randn_like(data) + sde.mu) * sde.mask # X_T for reverse mode
-      # init = np.concatenate([mutils.to_flattened_numpy(rand_data), np.zeros((shape[0],))], axis=0)
+        solution = integrate.solve_ivp(ode_func, (sde.T, eps), init, rtol=rtol, atol=atol, method=method)
+        x_0 = solution.y[:, -1][:-shape[0]].reshape(shape)
+        # zp = solution.y[:, -1]
+        # delta_logp = mutils.from_flattened_numpy(zp[-shape[0]:], (shape[0],)).to(data.device).type(torch.float32)
+        # print(delta_logp)
+        loss = torch.nn.MSELoss()
+        mse = loss(data, torch.tensor(x_0).to(data))
+        print('mse', mse)
+        plt.imshow(x_0[0])
+        plt.savefig('ode_sample.png')
 
-      # solution = integrate.solve_ivp(ode_func, (sde.T, eps), init, rtol=rtol, atol=atol, method=method)
-      # x_0 = solution.y[:, -1][:-shape[0]].reshape(shape)
-      # plt.imshow(x_0[0])
-      # plt.savefig('ode_sample.png')
+        return mse
+      
+
+      # return ode_sample()
 
       # find likelihood
       data = data * sde.mask
       init = np.concatenate([mutils.to_flattened_numpy(data), np.zeros((shape[0],))], axis=0)
       ode_deltas = []
       ode_t = []
-      print('about to integrate')
       solution = integrate.solve_ivp(ode_func, (eps, sde.T), init, rtol=rtol, atol=atol, method=method)
       plt.clf()
       plt.scatter(ode_t[1:], ode_deltas[1:])
       plt.savefig(f'../delta_plots/speech_rk45.png')
-      ode_deltas = []
-      print('Integrated')
       # print(solution)
       nfe = solution.nfev
       zp = solution.y[:, -1]
+
+
+      delta_logp_graph = solution.y[:, :][-1, :]
+      plt.clf()
+      plt.title('delta logp')
+      plt.plot(delta_logp_graph)
+      plt.savefig('../delta_plots/delta_logp.png')
       z = mutils.from_flattened_numpy(zp[:-shape[0]], shape).to(data.device).type(torch.float32)
       delta_logp = mutils.from_flattened_numpy(zp[-shape[0]:], (shape[0],)).to(data.device).type(torch.float32)
       prior_logp = sde.prior_logp(z)
-      # print(z, 'z')
-      print(delta_logp)
+
+      # print('gaussian')
+      # print('mean ', torch.mean(z), 'spread ', torch.std(z))
+      # print('text')
+      # print('mean ', torch.mean(sde.mu), 'spread ', torch.std(sde.mu))
+
+      # print('change in mean ', (torch.mean(z) - torch.mean(sde.mu)))
+
+      # print('delta logp', delta_logp)
+      # print('prior logp', prior_logp)
       bpd = -(prior_logp + delta_logp) / np.log(2)
       N = np.prod(shape[1:])
       bpd = bpd / N
@@ -212,6 +235,10 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
       bpd = bpd + offset
 
       logpx0 = prior_logp + delta_logp
-      return logpx0
+
+      print('logp(x0) ', logpx0)
+
+      bpd = - logpx0 / np.log(2) / N 
+      return bpd.item()
 
   return likelihood_fn

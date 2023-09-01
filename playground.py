@@ -116,21 +116,22 @@ if __name__ == '__main__':
         y_lengths = item['y_lengths'].cuda()
 
 
-        # noisy_text = "The thought of poor dead Annie Coulson flashed into Philip's mind."
-        # noisy_text = 'That is the kind of hold that curiosity has on the monkeys.'
-        # noisy_text = 'I was at this time knitting a pair of white cotton stockings for my mistress; and had not yet wrought upon a Sabbath day.'
+        noisy_text = "The thought of poor dead Annie Coulson flashed into Philip's mind."
+        noisy_text = 'That is the kind of hold that curiosity has on the monkeys.'
+        noisy_text = 'I was at this time knitting a pair of white cotton stockings for my mistress; and had not yet wrought upon a Sabbath day.'
+        noisy_text = 'Matthew Cuthbert is surprised'
         # noisy_text = ' and had not yet listen to black Sabbath today.I was eating a pair of black cotton stockings stockings;'
-        noisy_text = 'How much wood would a wood chuck chuck if a wood chuck would chuck wood?'
+        # noisy_text = 'How much wood would a wood chuck chuck if a wood chuck would chuck wood?'
         # noisy_text = 'hi'
         text = torch.LongTensor(intersperse(text_to_sequence(noisy_text, dictionary=cmu), len(symbols))).cuda()[None]
         x_lengths = torch.LongTensor([text.shape[-1]]).cuda()
-
-        # text = torch.randn_like(text.to(torch.float32)).to(torch.long)
-        # speech = torch.randn_like(speech)
+        print('different text')
 
 
         score_model, mu, spk_emb, mask = generator.get_score_model(text.cuda(), x_lengths.cuda(), speech.cuda(), y_lengths.cuda(), spk.cuda())
         sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb, mask=mask)  
+        plt.imshow(mu[0].detach().cpu())
+        plt.savefig('mu.png')
 
         # n_timesteps = 10
         # h = 1.0 / n_timesteps
@@ -155,15 +156,16 @@ if __name__ == '__main__':
         # # generator.decoder.reverse_diffusion(z.cuda(), mask, mu, n_timesteps, stoc=False, spk=generator.spk_emb(spk.cuda()))
         # generator(text, x_lengths, n_timesteps, spk=spk)
 
-        likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x)
+        likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x, rtol=1e-2, atol=1e-2, hutchinson_type='Rademacher')
 
 
         score_model = score_model.cuda()
 
-        print('Calculating likelihood')
+        print('\nCalculating likelihood')
 
-        print('\n', likelihood_fn(score_model, speech), 'NLL')
+        print('\n', np.mean([likelihood_fn(score_model, speech) for i in range(5)]), 'bpd')
         print('Thats a nice likelihood!')
+
 
 
 

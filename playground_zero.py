@@ -29,6 +29,8 @@ import matplotlib.pyplot as plt
 from data import TextMelZeroSpeakerDataset, TextMelZeroSpeakerBatchCollate
 from torch.utils.data import DataLoader
 
+from text import text_to_sequence, cmudict
+
 from likelihood import likelihood, sde_lib
 
 train_filelist_path = params.train_filelist_path
@@ -92,6 +94,7 @@ if __name__ == '__main__':
 
     
     
+    cmu = cmudict.CMUDict('./resources/cmu_dictionary')
     
     # set up SDE (maybe done by gradtts already?)
             
@@ -115,10 +118,18 @@ if __name__ == '__main__':
         x_lengths = item['x_lengths']
         y_lengths = item['y_lengths']
 
-        score_model, mu, spk_emb = generator.get_score_model(text.cuda(), x_lengths.cuda(), speech.cuda(), y_lengths.cuda(), spk.cuda())
+
+        noisy_text = 'How much wood would a wood chuck chuck if a wood chuck would chuck wood?'
+        # # noisy_text = 'hi'
+        # text = torch.LongTensor(intersperse(text_to_sequence(noisy_text, dictionary=cmu), len(symbols))).cuda()[None]
+        # x_lengths = torch.LongTensor([text.shape[-1]]).cuda()
+
+        score_model, mu, spk_emb, mask = generator.get_score_model(text.cuda(), x_lengths.cuda(), speech.cuda(), y_lengths.cuda(), spk.cuda())
+
+        plt.imshow(torch.cov(mu[0]).detach().cpu())
+        plt.savefig('cov_ted_wrong.png')
         
-        sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb)  
-        # sde = sde_lib.VPSDE(beta_min=beta_min, beta_max=beta_max, N=50)  
+        sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb, mask=mask)  
 
         likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x)
 
