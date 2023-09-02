@@ -119,15 +119,17 @@ if __name__ == '__main__':
         y_lengths = item['y_lengths']
 
 
-        noisy_text = 'How much wood would a wood chuck chuck if a wood chuck would chuck wood?'
-        # # noisy_text = 'hi'
+        # noisy_text = 'How much wood would a wood chuck chuck if a wood chuck would chuck wood?'
+        # noisy_text = 'hi'
         # text = torch.LongTensor(intersperse(text_to_sequence(noisy_text, dictionary=cmu), len(symbols))).cuda()[None]
         # x_lengths = torch.LongTensor([text.shape[-1]]).cuda()
 
         score_model, mu, spk_emb, mask = generator.get_score_model(text.cuda(), x_lengths.cuda(), speech.cuda(), y_lengths.cuda(), spk.cuda())
-
-        plt.imshow(torch.cov(mu[0]).detach().cpu())
-        plt.savefig('cov_ted_wrong.png')
+        print(y_lengths)
+        print(speech.size())
+        print(mask.size())
+        # plt.imshow(torch.cov(mu[0]).detach().cpu())
+        # plt.savefig('cov_ted_wrong.png')
         
         sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb, mask=mask)  
 
