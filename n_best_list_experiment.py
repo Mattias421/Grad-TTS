@@ -14,6 +14,9 @@ import torch
 from torch.utils.data import DataLoader
 import argparse
 
+import numpy as np
+from tqdm import tqdm
+
 from likelihood import likelihood, sde_lib
 
 train_filelist_path = params.train_filelist_path
@@ -62,27 +65,26 @@ def get_n_best_list(idx, n_best_list, N=10):
 
 def rescore(audio, texts, spk, generator):
 
-    y_lengths = torch.LongTensor([audio.shape[-1]])
+    y_lengths = torch.LongTensor([audio.shape[-1]]).cuda()
 
-    diffusion_am_scores = []
-
-    for text in texts:
+    def score_text(text):
         text = torch.LongTensor(intersperse(text_to_sequence(text, dictionary=cmu), len(symbols))).cuda()[None]
-        x_lengths = torch.LongTensor([text.shape[-1]])
+        x_lengths = torch.LongTensor([text.shape[-1]]).cuda()
 
-        score_model, mu, spk_emb, mask = generator.get_score_model(text.cuda(), x_lengths.cuda(), audio.cuda(), y_lengths.cuda(), spk.cuda())
+        score_model, mu, spk_emb, mask = generator.get_score_model(text, x_lengths, audio, y_lengths, spk)
         sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb, mask=mask)  
 
         likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x)
 
-
         score_model = score_model.cuda()
 
-        logp0 = likelihood_fn(score_model, audio.cuda())
+        score = likelihood_fn(score_model, audio)
 
-        diffusion_am_scores.append(logp0)
+        return score
 
-    return diffusion_am_scores
+    new_scores = list(map(score_text, texts))
+
+    return new_scores
 
 def main(args):
     test_dataset = TextMelZeroSpeakerDataset(valid_filelist_path, valid_spk, cmudict_path, add_blank,
@@ -106,21 +108,31 @@ def main(args):
     with open('/store/store4/data/nbests/tedlium/dev_tmp_out.pkl', 'rb') as f:
         n_best_list = pickle.load(f) 
 
-    print(f'Rescoring {len(n_best_list)} utterances')
+    N = 10
 
-    for i, item in enumerate(loader):
-        audio = item['y']
-        spk = item['spk']
+    print(f'Rescoring {N} best of {len(n_best_list)} utterances')
 
-        texts = get_n_best_list(i, n_best_list)
+    new_scores_dataset = np.zeros((len(n_best_list), N))
 
-        rescore(audio, texts, spk, generator)
+    for i, item in tqdm(enumerate(loader)):
+        audio = item['y'].cuda()
+        spk = item['spk'].cuda()
 
-        break
+        texts = get_n_best_list(i, n_best_list, N)
+
+        new_am_scores = rescore(audio, texts, spk, generator)
+
+        new_scores_dataset[i, :] = new_am_scores
+
+        new_scores_dataset.tofile(f'../logs/nbest_exp/{args.name}.csv', sep=',')
+
+        torch.cuda.empty_cache()
+        
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--checkpoint', type=str, required=True, help='path to a checkpoint of Grad-TTS')
+    parser.add_argument('-n', '--name', type=str, default='result')
     args = parser.parse_args()
 
     main(args)

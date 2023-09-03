@@ -35,12 +35,23 @@ def load_corpus(
             ds[split] = ds[split].transform_text(transform_txt)
     return ds 
 
+def speaker_id(id, log):
+    id = id.split('_')[0]
+    if id not in log:
+        log.append(id)
+    return log.index(id), log
+
+spk_log = []
+
 for split in ['train', 'dev', 'test']:
     corpus = load_corpus()[split]
     
-    with open(f'../resources/filelists/tedlium/{split}.txt', 'w') as f:
+    with open(f'../resources/filelists/tedlium_speaker/{split}.txt', 'w') as f:
         for i in corpus:
             path = i.recording.sources[0].source
             text = i.supervisions[0].text
-            f.write(f'{path}|{text}\n')
+            spk, spk_log = speaker_id(i.supervisions[0].speaker, spk_log)
+            f.write(f'{path}|{text}|{spk}\n')
+
+print(f'{len(spk_log)} speakers.')
 

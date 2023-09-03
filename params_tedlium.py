@@ -10,7 +10,7 @@ from model.utils import fix_len_compatibility
 
 
 # data parameters
-train_filelist_path = 'resources/filelists/tedlium/train.txt' # tedlium corpus doesn't use filelist
+train_filelist_path = 'resources/filelists/tedlium/train.txt' 
 valid_filelist_path = 'resources/filelists/tedlium/dev.txt'
 test_filelist_path = 'resources/filelists/tedlium/test.txt'
 train_spk = '/store/store4/data/TEDLIUM_release1/tedlium/spk_emb/train.pt'
@@ -46,7 +46,7 @@ beta_max = 20.0
 pe_scale = 1000  # 1 for `grad-tts-old.pt` checkpoint
 
 # training parameters
-log_dir = '../logs/tedlium-1/new_test/'
+log_dir = '../logs/tedlium-1/spk_id/'
 test_size = 1 
 n_epochs = 50
 batch_size = 16

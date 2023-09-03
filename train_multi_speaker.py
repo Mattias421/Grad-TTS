@@ -13,7 +13,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
-import params#_tedlium as params # changed
+import params_tedlium_spk as params # changed
 from model import GradTTS
 from data import TextMelSpeakerDataset, TextMelSpeakerBatchCollate
 from utils import plot_tensor, save_plot
