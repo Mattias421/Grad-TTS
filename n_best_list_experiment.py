@@ -1,8 +1,7 @@
 import pickle
 from likelihood import likelihood, sde_lib
-from data import TextMelZeroSpeakerDataset, TextMelZeroSpeakerBatchCollate
+from data import TextMelZeroSpeakerDataset, TextMelZeroSpeakerBatchCollate, TextMelSpeakerDataset, TextMelSpeakerBatchCollate
 
-import params_tedlium as params
 from model import GradTTS
 from text.symbols import symbols
 from utils import intersperse
@@ -19,14 +18,21 @@ from tqdm import tqdm
 
 from likelihood import likelihood, sde_lib
 
+speaker_id = True
+
+if speaker_id:
+    import params_tedlium_spk as params
+else:
+    import params_tedlium as params
+    valid_spk = params.valid_spk
+    test_spk = params.test_spk
+
 train_filelist_path = params.train_filelist_path
 valid_filelist_path = params.valid_filelist_path
 test_filelist_path = params.test_filelist_path
 cmudict_path = params.cmudict_path
 add_blank = params.add_blank
 
-valid_spk = params.valid_spk
-test_spk = params.test_spk
 
 log_dir = params.log_dir
 n_epochs = params.n_epochs
@@ -87,10 +93,16 @@ def rescore(audio, texts, spk, generator):
     return new_scores
 
 def main(args):
-    test_dataset = TextMelZeroSpeakerDataset(valid_filelist_path, valid_spk, cmudict_path, add_blank,
-                                    n_fft, n_feats, sample_rate, hop_length,
-                                    win_length, f_min, f_max)
-    batch_collate = TextMelZeroSpeakerBatchCollate()
+    if speaker_id:
+        test_dataset = TextMelSpeakerDataset(valid_filelist_path, cmudict_path, add_blank,
+                                        n_fft, n_feats, sample_rate, hop_length,
+                                        win_length, f_min, f_max)
+        batch_collate = TextMelSpeakerBatchCollate()
+    else:
+        test_dataset = TextMelZeroSpeakerDataset(valid_filelist_path, params.valid_spk, cmudict_path, add_blank,
+                                        n_fft, n_feats, sample_rate, hop_length,
+                                        win_length, f_min, f_max)
+        batch_collate = TextMelZeroSpeakerBatchCollate()
     loader = DataLoader(dataset=test_dataset, batch_size=1,
                         collate_fn=batch_collate, drop_last=True,
                         num_workers=8, shuffle=False)
@@ -133,6 +145,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--checkpoint', type=str, required=True, help='path to a checkpoint of Grad-TTS')
     parser.add_argument('-n', '--name', type=str, default='result')
+    # parser.add_argument('-s', '--speaker_id', type=bool, choices=[True, False], help='Choose whether to use speaker id or speaker embedding')
     args = parser.parse_args()
 
     main(args)
