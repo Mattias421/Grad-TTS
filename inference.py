@@ -18,7 +18,7 @@ import params_tedlium_spk as params
 from model import GradTTS
 from text import text_to_sequence, cmudict
 from text.symbols import symbols
-from utils import intersperse
+from utils import intersperse, save_plot
 
 import sys
 sys.path.append('./hifi-gan/')
@@ -79,10 +79,8 @@ if __name__ == '__main__':
             t = (dt.datetime.now() - t).total_seconds()
             print(f'Grad-TTS RTF: {t * 22050 / (y_dec.shape[-1] * 256)}')
 
-            plt.imshow(y_dec[0].cpu())
-            plt.savefig(f'./out/mel_{i}')
-            plt.imshow(y_enc[0].cpu())
-            plt.savefig(f'./out/mu_{i}')
+            save_plot(y_dec[0].cpu(), f'./out/mel_{i}')
+            save_plot(y_enc[0].cpu(), f'./out/mu_{i}')
             
 
             audio = (vocoder.forward(y_dec).cpu().squeeze().clamp(-1, 1).numpy() * 32768).astype(np.int16)

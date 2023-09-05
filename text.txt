@@ -1,1 +1,3 @@
-Diffusion models are very good for text to speech.
+Diffusion models are very good for text to speech synthesis
+Hello today I will be talking about Diffusion, welcome to my ted talk
+there is an old african proverb that says if you want to go quickly go alone if you want to go far go together we need to go far quickly, thank you very much

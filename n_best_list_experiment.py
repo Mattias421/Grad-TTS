@@ -153,7 +153,7 @@ def main(args):
         n_best_list = pickle.load(f) 
 
     N = 5
-    BATCH_SIZE = 1
+    BATCH_SIZE = 2
 
     dataset = NBestDataset(test_dataset, n_best_list, N)
     loader = DataLoader(dataset=dataset, batch_size=BATCH_SIZE, collate_fn=batch_collate, num_workers=30)
