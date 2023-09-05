@@ -27,6 +27,7 @@ else:
     valid_spk = params.valid_spk
     test_spk = params.test_spk
 
+
 train_filelist_path = params.train_filelist_path
 valid_filelist_path = params.valid_filelist_path
 test_filelist_path = params.test_filelist_path
@@ -69,30 +70,60 @@ def get_n_best_list(idx, n_best_list, N=10):
     texts = [n_best_list[idx]['beams'][0][i]['text'] for i in range(N)]
     return texts
 
-def rescore(audio, texts, spk, generator):
+def rescore(batch, generator, device):
 
-    y_lengths = torch.LongTensor([audio.shape[-1]]).cuda()
+    text = batch['x'].to(device)
+    audio = batch['y'].to(device)
+    spk = batch['spk'].to(device)
+    x_lengths = batch['x_lengths'].to(device)
+    y_lengths = batch['y_lengths'].to(device)
 
-    def score_text(text):
-        text = torch.LongTensor(intersperse(text_to_sequence(text, dictionary=cmu), len(symbols))).cuda()[None]
-        x_lengths = torch.LongTensor([text.shape[-1]]).cuda()
+    score_model, mu, spk_emb, mask = generator.get_score_model(text, x_lengths, audio, y_lengths, spk)
+    sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb, mask=mask)  
 
-        score_model, mu, spk_emb, mask = generator.get_score_model(text, x_lengths, audio, y_lengths, spk)
-        sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb, mask=mask)  
+    likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x, rtol=1e-3, atol=1e-3)
 
-        likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x)
+    score_model = score_model.to(device)
 
-        score_model = score_model.cuda()
+    score = likelihood_fn(score_model, audio)
 
-        score = likelihood_fn(score_model, audio)
+    print(score)
 
-        return score
+    return score.cpu().numpy()
 
-    new_scores = list(map(score_text, texts))
+class NBestDataset(torch.utils.data.Dataset):
+    def __init__(self, text_mel_dataset, n_best_list, N):
+        self.text_meldataset = text_mel_dataset
+        self.n_best_list = n_best_list
+        self.N = N
 
-    return new_scores
+    def __len__(self):
+        return len(self.text_meldataset) * self.N
+    
+    def get_n_best_hypothesis(self, item_idx, n_idx):
+        text = self.n_best_list[item_idx]['beams'][0][n_idx]['text']
+        
+        if len(text.strip(' ')) == 0:
+            text += ' '
+        return self.text_meldataset.get_text(text)
+    
+    def __getitem__(self, idx):
+        item_idx = int(np.floor(idx / self.N))
+        n_idx = idx % self.N
+
+
+        item = self.text_meldataset[item_idx]
+
+        item['x'] = self.get_n_best_hypothesis(item_idx, n_idx)
+        return item
+    
+
 
 def main(args):
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    device = torch.device(f'cuda:{args.gpu}')
+
     if speaker_id:
         test_dataset = TextMelSpeakerDataset(valid_filelist_path, cmudict_path, add_blank,
                                         n_fft, n_feats, sample_rate, hop_length,
@@ -103,6 +134,7 @@ def main(args):
                                         n_fft, n_feats, sample_rate, hop_length,
                                         win_length, f_min, f_max)
         batch_collate = TextMelZeroSpeakerBatchCollate()
+
     loader = DataLoader(dataset=test_dataset, batch_size=1,
                         collate_fn=batch_collate, drop_last=True,
                         num_workers=8, shuffle=False)
@@ -115,36 +147,45 @@ def main(args):
                             params.n_feats, params.dec_dim, params.beta_min, params.beta_max, params.pe_scale)
 
     generator.load_state_dict(torch.load(args.checkpoint, map_location=lambda loc, storage: loc))
-    _ = generator.cuda().eval()
+    _ = generator.to(device).eval()
 
     with open('/store/store4/data/nbests/tedlium/dev_tmp_out.pkl', 'rb') as f:
         n_best_list = pickle.load(f) 
 
-    N = 10
+    N = 5
+    BATCH_SIZE = 1
 
-    print(f'Rescoring {N} best of {len(n_best_list)} utterances')
+    dataset = NBestDataset(test_dataset, n_best_list, N)
+    loader = DataLoader(dataset=dataset, batch_size=BATCH_SIZE, collate_fn=batch_collate, num_workers=30)
 
-    new_scores_dataset = np.zeros((len(n_best_list), N))
+    n_samples = len(test_dataset)
 
-    for i, item in tqdm(enumerate(loader)):
-        audio = item['y'].cuda()
-        spk = item['spk'].cuda()
+    print(f'Rescoring {N} best of {n_samples} utterances')
 
-        texts = get_n_best_list(i, n_best_list, N)
+    new_scores_dataset = np.zeros((n_samples * N))
 
-        new_am_scores = rescore(audio, texts, spk, generator)
+    for i, batch in tqdm(enumerate(loader)):
+        
+        if i < 0:
+            continue
 
-        new_scores_dataset[i, :] = new_am_scores
+        new_am_scores = rescore(batch, generator, device)
 
-        new_scores_dataset.tofile(f'../logs/nbest_exp/{args.name}.csv', sep=',')
+        new_scores_dataset[i*BATCH_SIZE:i*BATCH_SIZE+BATCH_SIZE] = new_am_scores
 
+        new_scores_dataset.reshape((n_samples, N)).tofile(f'../logs/nbest_exp/{args.name}.csv', sep=',')
+
+        torch.cuda.set_device(1)
         torch.cuda.empty_cache()
+
         
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--checkpoint', type=str, required=True, help='path to a checkpoint of Grad-TTS')
     parser.add_argument('-n', '--name', type=str, default='result')
+    parser.add_argument('-g', '--gpu', type=int, default=1, help='Choose which GPU to use')
+    parser.add_argument('-s', '--seed', type=int, default=1, help='Choose which seed to use')
     # parser.add_argument('-s', '--speaker_id', type=bool, choices=[True, False], help='Choose whether to use speaker id or speaker embedding')
     args = parser.parse_args()
 

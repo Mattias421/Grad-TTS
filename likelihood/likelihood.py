@@ -39,7 +39,7 @@ def get_div_fn(fn):
 
 
 def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
-                      rtol=1e-5, atol=1e-5, method='RK45', eps=1e-5):
+                      rtol=1e-5, atol=1e-5, method='RK45', eps=1e-5, euler=False):
   """Create a function to compute the unbiased log-likelihood estimate of a given data point.
 
   Args:
@@ -51,6 +51,7 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
     method: A `str`. The algorithm for the black-box ODE solver.
       See documentation for `scipy.integrate.solve_ivp`.
     eps: A `float` number. The probability flow ODE is integrated to `eps` for numerical stability.
+    euler: A `int` that chooses how man 
 
   Returns:
     A function that a batch of data points and returns the log-likelihoods in bits/dim,
@@ -95,23 +96,39 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
         logp_grad = mutils.to_flattened_numpy(div_fn(model, sample, vec_t, epsilon))
         return np.concatenate([drift, logp_grad], axis=0)
       
+      def euler_maruyama(ode_func, init, N=100):
+
+        h = 1 / N
+        y = init
+
+        for i in range(N):
+          t = ((i + 0.5)*h)
+          y = y + ode_func(t, y) * h
+        
+        return y
+
       # find likelihood
       data = data * sde.mask
       init = np.concatenate([mutils.to_flattened_numpy(data), np.zeros((shape[0],))], axis=0)
-      solution = integrate.solve_ivp(ode_func, (eps, sde.T), init, rtol=rtol, atol=atol, method=method)
-      zp = solution.y[:, -1]
+
+      if euler:
+        solution = euler_maruyama(ode_func, init)
+        zp = solution
+      else:
+        solution = integrate.solve_ivp(ode_func, (eps, sde.T), init, rtol=rtol, atol=atol, method=method)
+        zp = solution.y[:, -1]
 
       z = mutils.from_flattened_numpy(zp[:-shape[0]], shape).to(data.device).type(torch.float32)
       delta_logp = mutils.from_flattened_numpy(zp[-shape[0]:], (shape[0],)).to(data.device).type(torch.float32)
       prior_logp = sde.prior_logp(z)
       
-      bpd = -(prior_logp + delta_logp) / np.log(2)
-      N = np.prod(shape[1:])
-      bpd = bpd / N
+      bpd = -(prior_logp + delta_logp) # / np.log(2)
+      # N = np.prod(shape[1:])
+      # bpd = bpd / N
       # A hack to convert log-likelihoods to bits/dim
       # offset = 7. - inverse_scaler(-1.)
       # bpd = bpd + offset
 
-      return bpd.item()
+      return bpd
 
   return likelihood_fn

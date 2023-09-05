@@ -1,1 +1,1 @@
-This is some real good text to speech synthesis.
+Diffusion models are very good for text to speech.

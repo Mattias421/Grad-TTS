@@ -14,7 +14,7 @@ from scipy.io.wavfile import write
 
 import torch
 
-import params
+import params_tedlium_spk as params
 from model import GradTTS
 from text import text_to_sequence, cmudict
 from text.symbols import symbols
