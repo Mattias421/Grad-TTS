@@ -81,7 +81,7 @@ def rescore(batch, generator, device):
     score_model, mu, spk_emb, mask = generator.get_score_model(text, x_lengths, audio, y_lengths, spk)
     sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb, mask=mask)  
 
-    likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x, rtol=1e-3, atol=1e-3)
+    likelihood_fn = likelihood.get_likelihood_fn(sde, lambda x : x, rtol=1e-3, atol=1e-3, euler=50)
 
     score_model = score_model.to(device)
 
@@ -135,10 +135,6 @@ def main(args):
                                         win_length, f_min, f_max)
         batch_collate = TextMelZeroSpeakerBatchCollate()
 
-    loader = DataLoader(dataset=test_dataset, batch_size=1,
-                        collate_fn=batch_collate, drop_last=True,
-                        num_workers=8, shuffle=False)
-
 
     generator = GradTTS(len(symbols)+1, params.n_spks, params.spk_emb_dim,
                             params.n_enc_channels, params.filter_channels,
@@ -152,8 +148,10 @@ def main(args):
     with open('/store/store4/data/nbests/tedlium/dev_tmp_out.pkl', 'rb') as f:
         n_best_list = pickle.load(f) 
 
-    N = 5
-    BATCH_SIZE = 2
+    N = 10
+    BATCH_SIZE = 1
+
+    print(len(test_dataset))
 
     dataset = NBestDataset(test_dataset, n_best_list, N)
     loader = DataLoader(dataset=dataset, batch_size=BATCH_SIZE, collate_fn=batch_collate, num_workers=30)

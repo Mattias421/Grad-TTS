@@ -52,6 +52,7 @@ for split in ['train', 'dev', 'test']:
             text = i.supervisions[0].text
             spk, spk_log = speaker_id(i.supervisions[0].speaker, spk_log)
             f.write(f'{path}|{text}|{spk}\n')
-
+# for i, spk in enumerate(spk_log):
+    # print(i, spk)
 print(f'{len(spk_log)} speakers.')
 

@@ -39,7 +39,7 @@ def get_div_fn(fn):
 
 
 def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
-                      rtol=1e-5, atol=1e-5, method='RK45', eps=1e-5, euler=False):
+                      rtol=1e-5, atol=1e-5, method='RK45', eps=1e-5, euler=0):
   """Create a function to compute the unbiased log-likelihood estimate of a given data point.
 
   Args:
@@ -51,7 +51,7 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
     method: A `str`. The algorithm for the black-box ODE solver.
       See documentation for `scipy.integrate.solve_ivp`.
     eps: A `float` number. The probability flow ODE is integrated to `eps` for numerical stability.
-    euler: A `int` that chooses how man 
+    euler: A `int` that chooses how many Euler iterations to use, set to 0 to use blackbox instead 
 
   Returns:
     A function that a batch of data points and returns the log-likelihoods in bits/dim,
@@ -97,7 +97,6 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
         return np.concatenate([drift, logp_grad], axis=0)
       
       def euler_maruyama(ode_func, init, N=100):
-
         h = 1 / N
         y = init
 
@@ -111,8 +110,8 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
       data = data * sde.mask
       init = np.concatenate([mutils.to_flattened_numpy(data), np.zeros((shape[0],))], axis=0)
 
-      if euler:
-        solution = euler_maruyama(ode_func, init)
+      if euler > 0:
+        solution = euler_maruyama(ode_func, init, euler)
         zp = solution
       else:
         solution = integrate.solve_ivp(ode_func, (eps, sde.T), init, rtol=rtol, atol=atol, method=method)
