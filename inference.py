@@ -56,6 +56,8 @@ if __name__ == '__main__':
 
     
     print('Initializing Grad-TTS...')
+    print(params.n_spks)
+    print(params.spk_emb_dim)
     generator = GradTTS(len(symbols)+1, params.n_spks, params.spk_emb_dim,
                         params.n_enc_channels, params.filter_channels,
                         params.filter_channels_dp, params.n_heads, params.n_enc_layers,

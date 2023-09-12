@@ -1,0 +1,14 @@
+seed: 1
+'n': 10
+n_best_list: /store/store4/data/nbests/tedlium/dev_tmp_out.pkl
+diff_score_list: /exp/exp4/acq22mc/diff_list/logs/nbest_exp/e330_euler10_n10.csv
+weights:
+  first_pass_score: -2.0
+  am_score: 0
+  bpe_lm_score: 2.0
+  first_pass_length_penalty: -2.5
+  ngram_lm_score_non_oov: 0
+  ngram_lm_score_oov: 0
+  ngram_lm_score: -2.5
+  second_pass_score: 0
+  diffusion_score: 0.0001

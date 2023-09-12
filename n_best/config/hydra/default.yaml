@@ -1,0 +1,13 @@
+job:
+  name : 'n_best_list'
+  chdir: true
+  config:
+    override_dirname:
+      exclude_keys:
+        - data
+        - weights.*
+run:
+  dir: ../hydra_outputs/${hydra.job.name}/${now:%Y-%m-%d}/${now:%H-%M-%S}
+sweep:
+  dir: ${hydra.run.dir}/
+  subdir: ${hydra.job.num}

@@ -109,6 +109,8 @@ class MultiHeadAttention(BaseModule):
         self.p_dropout = p_dropout
         self.attn = None
 
+        print(channels)
+
         self.k_channels = channels // n_heads
         self.conv_q = torch.nn.Conv1d(channels, channels, 1)
         self.conv_k = torch.nn.Conv1d(channels, channels, 1)
@@ -251,6 +253,8 @@ class Encoder(BaseModule):
         self.p_dropout = p_dropout
         self.window_size = window_size
 
+        print(hidden_channels)
+
         self.drop = torch.nn.Dropout(p_dropout)
         self.attn_layers = torch.nn.ModuleList()
         self.norm_layers_1 = torch.nn.ModuleList()
@@ -295,6 +299,11 @@ class TextEncoder(BaseModule):
         self.window_size = window_size
         self.spk_emb_dim = spk_emb_dim
         self.n_spks = n_spks
+
+        print(n_channels + (self.spk_emb_dim if self.n_spks > 1 else 0))
+        print(n_channels)
+        print(self.spk_emb_dim)
+        print(self.n_spks)
 
         self.emb = torch.nn.Embedding(n_vocab, n_channels)
         torch.nn.init.normal_(self.emb.weight, 0.0, n_channels**-0.5)

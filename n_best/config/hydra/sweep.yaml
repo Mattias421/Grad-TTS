@@ -1,0 +1,42 @@
+job:
+  name : 'n_best_list'
+  chdir: true
+  config:
+    override_dirname:
+      exclude_keys:
+        - data
+        - weights.*
+run:
+  dir: ../../hydra_outputs/${hydra.job.name}/${now:%Y-%m-%d_%H-%M-%S}
+sweep:
+  dir: ${hydra.run.dir}/
+  subdir: ${hydra.job.num}
+sweeper:
+  # @package hydra.sweeper
+  sampler:
+    _target_: optuna.samplers.TPESampler
+    seed: 1
+    consider_prior: true
+    prior_weight: 1.0
+    consider_magic_clip: true
+    consider_endpoints: false
+    n_startup_trials: 10
+    n_ei_candidates: 24
+    multivariate: false
+    warn_independent_sampling: true
+  _target_: hydra_plugins.hydra_optuna_sweeper.optuna_sweeper.OptunaSweeper
+  direction: minimize
+  storage: null
+  study_name: n_best_weights
+  n_trials: 1000
+  n_jobs: 1
+  params:
+    weights.am_score: interval(-1.0,0.0)
+    weights.bpe_lm_score: interval(0.0,2.0)
+    weights.first_pass_length_penalty: interval(-3.0,0.0)
+    weights.ngram_lm_score: interval(-2.0,0.0)
+    weights.diffusion_score: interval(0.00,0.003)
+    weights.ngram_lm_score_oov: interval(-1.0,0)
+    weights.ngram_lm_score_non_oov: interval(-1.0,0)
+    weights.first_pass_score: interval(-2.0,0)
+    weights.second_pass_score: interval(-2.0,0)

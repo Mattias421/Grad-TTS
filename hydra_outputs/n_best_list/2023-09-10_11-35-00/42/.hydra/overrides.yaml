@@ -1,0 +1,8 @@
+- weights.first_pass_score=-2.5
+- weights.am_score=-0.5
+- weights.bpe_lm_score=2.0
+- weights.first_pass_length_penalty=-2.0
+- weights.ngram_lm_score=-2.5
+- weights.diffusion_score=0
+- hydra=sweep
+- diff_score_list=/exp/exp4/acq22mc/diff_list/logs/nbest_exp/e330_euler10_n10.csv

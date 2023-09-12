@@ -1,0 +1,11 @@
+am_score: -0.5
+bpe_lm_score: 1.5
+diff_config: e330_euler10_n10
+diffusion_score: 0.0001
+first_pass_length_penalty: -2.0
+first_pass_score: -2.0
+ngram_lm_score: -2.5
+ngram_lm_score_non_oov: 0
+ngram_lm_score_oov: 0
+second_pass_score: 0
+wer: 0.09900550030557254
