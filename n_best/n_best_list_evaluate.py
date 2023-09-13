@@ -18,7 +18,7 @@ def get_n_best_list(idx, n_best_list, N=10):
     return texts
 
 
-def get_best_transcription(idx, n_best_list, alpha):
+def get_best_transcription(idx, n_best_list, alpha, N):
 
     reference = n_best_list[idx]['targets']
 
@@ -28,7 +28,7 @@ def get_best_transcription(idx, n_best_list, alpha):
 
     best_list = list(n_best_list[idx]['beams'][0].values())
 
-    best_list = best_list[:10]
+    best_list = best_list[:N]
 
     new_list = sorted(best_list, key=rescoring)
 
@@ -36,7 +36,7 @@ def get_best_transcription(idx, n_best_list, alpha):
 
 
 
-def calc_wer(alpha, n_best_list, n_samples):
+def calc_wer(alpha, n_best_list, n_samples, N):
 
     references = []
     news = []
@@ -46,7 +46,7 @@ def calc_wer(alpha, n_best_list, n_samples):
     # 'ngram_lm_score', 'second_pass_score', 'diffusion_score'
 
     for i in range(n_samples):
-        ref, new = get_best_transcription(i, n_best_list, alpha)
+        ref, new = get_best_transcription(i, n_best_list, alpha, N)
         references.append(ref)
         news.append(new)
 
@@ -65,7 +65,7 @@ def main(cfg):
 
     diff_scores = np.genfromtxt(cfg.diff_score_list, delimiter=',').reshape((len(n_best_list), N))
 
-    # log.info(diff_scores.shape)
+    log.info(diff_scores.shape)
 
     n_samples = len(n_best_list)
 
@@ -77,7 +77,7 @@ def main(cfg):
             n_best_list[i]['beams'][0][n]['diffusion_score'] = 0
 
     alpha = list(cfg.weights.values())
-    result = calc_wer(alpha, n_best_list, n_samples)
+    result = calc_wer(alpha, n_best_list, n_samples, N)
 
     log.info(result)
 

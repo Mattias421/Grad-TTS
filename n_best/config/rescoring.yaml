@@ -3,7 +3,7 @@ defaults:
   - override hydra/sweeper: optuna
 
 seed: 1
-n: 10
+n: 100
 n_best_list: /store/store4/data/nbests/tedlium/dev_tmp_out.pkl
 diff_score_list: /exp/exp4/acq22mc/diff_list/logs/nbest_exp/e330_euler10_n10.csv
 

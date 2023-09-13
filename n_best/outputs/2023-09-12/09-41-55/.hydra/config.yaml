@@ -1,9 +1,0 @@
-seed: 1
-gpu: 0
-'n': 100
-n_euler: 10
-n_best_list: /store/store4/data/nbests/tedlium/dev_tmp_out.pkl
-checkpoint_dir: /exp/exp4/acq22mc/diff_list/logs/tedlium-1/spk_id/
-epoch: 330
-checkpoint: ${checkpoint_dir}/grad_${epoch}.pt
-name: e${epoch}_euler${n_euler}_n${n}
