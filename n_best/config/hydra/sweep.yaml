@@ -28,14 +28,14 @@ sweeper:
   direction: minimize
   storage: null
   study_name: n_best_weights
-  n_trials: 1000
+  n_trials: 500
   n_jobs: 1
   params:
     weights.am_score: interval(-1.0,0.0)
     weights.bpe_lm_score: interval(0.0,2.0)
     weights.first_pass_length_penalty: interval(-3.0,0.0)
     weights.ngram_lm_score: interval(-2.0,0.0)
-    weights.diffusion_score: interval(0.00,0.003)
+    weights.diffusion_score: interval(-0.003,0.000)
     weights.ngram_lm_score_oov: interval(-1.0,0)
     weights.ngram_lm_score_non_oov: interval(-1.0,0)
     weights.first_pass_score: interval(-2.0,0)
