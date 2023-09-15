@@ -4,6 +4,7 @@ from likelihood import likelihood, sde_lib
 import sys
 sys.path.append('../')
 from data import TextMelSpeakerDataset, TextMelSpeakerBatchCollate
+from torch.utils.data import DataLoader
 from model.utils import fix_len_compatibility
 
 from model import GradTTS
@@ -66,16 +67,11 @@ pe_scale = params.pe_scale
 
 def rescore(batch, generator, device, n_euler):
 
-    text = batch['x'].to(device)[None]
-    audio = batch['y'].to(device)[None]
+    text = batch['x'].to(device)
+    audio = batch['y'].to(device)
     spk = batch['spk'].to(device)
-    x_lengths = torch.LongTensor([text.shape[-1]]).to(device)
-    y_lengths = torch.LongTensor([audio.shape[-1]]).to(device)
-
-    y_max_length = fix_len_compatibility(y_lengths[0])
-    y = torch.zeros((1, n_feats, y_max_length), dtype=torch.float32)
-    y[0, :, :audio.shape[-1]] = audio
-    audio = y
+    x_lengths = batch['x_lengths'].to(device)
+    y_lengths = batch['y_lengths'].to(device)
 
     score_model, mu, spk_emb, mask = generator.get_score_model(text, x_lengths, audio, y_lengths, spk)
     sde = sde_lib.SPEECHSDE(beta_min=beta_min, beta_max=beta_max, N=pe_scale, mu=mu, spk=spk_emb, mask=mask)  
@@ -90,13 +86,17 @@ def rescore(batch, generator, device, n_euler):
 
 
 class NBestDataset(torch.utils.data.Dataset):
-    def __init__(self, text_mel_dataset, n_best_list, N):
+    """
+    Sample i, get n-best list
+    """
+    def __init__(self, text_mel_dataset, n_best_list, N, I):
         self.text_meldataset = text_mel_dataset
         self.n_best_list = n_best_list
         self.N = N
+        self.I = I
 
     def __len__(self):
-        return len(self.text_meldataset) * self.N
+        return self.N
     
     def get_n_best_hypothesis(self, item_idx, n_idx):
         text = self.n_best_list[item_idx]['beams'][0][n_idx]['text']
@@ -105,13 +105,11 @@ class NBestDataset(torch.utils.data.Dataset):
             text += ' '
         return self.text_meldataset.get_text(text)
     
-    def __getitem__(self, idx):
-        item_idx = int(np.floor(idx / self.N))
-        n_idx = idx % self.N
+    def __getitem__(self, n_idx):
 
-        item = self.text_meldataset[item_idx]
+        item = self.text_meldataset[self.I]
 
-        item['x'] = self.get_n_best_hypothesis(item_idx, n_idx)
+        item['x'] = self.get_n_best_hypothesis(self.I, n_idx)
         return item
     
 
@@ -125,6 +123,7 @@ def main(cfg):
                                     n_fft, n_feats, sample_rate, hop_length,
                                     win_length, f_min, f_max)
 
+    batch_collate = TextMelSpeakerBatchCollate()
     generator = GradTTS(len(symbols)+1, params.n_spks, params.spk_emb_dim,
                             params.n_enc_channels, params.filter_channels,
                             params.filter_channels_dp, params.n_heads, params.n_enc_layers,
@@ -138,22 +137,20 @@ def main(cfg):
         n_best_list = pickle.load(f) 
 
     N = cfg.N
+    I = cfg.I
 
-    dataset = NBestDataset(test_dataset, n_best_list, N)
-    idx = int(cfg.n_best_dataset_index)
-    item_idx = int(np.floor(idx / N))
-    n_idx = idx % N
+    dataset = NBestDataset(test_dataset, n_best_list, N, I)
+    loader = DataLoader(dataset=dataset, batch_size=1, collate_fn=batch_collate, num_workers=28)
 
-    batch = dataset[idx]
+    for n, batch in enumerate(loader):
+        score = rescore(batch, generator, device, cfg.n_euler)
 
-    score = rescore(batch, generator, device, cfg.n_euler)
+        log.info(score)
 
-    log.info(score)
+        output = {'i':I, 'n':n, 'N':N, 'name':cfg.name, 'diffusion_score':float(score)}
 
-    output = {'i':item_idx, 'n':n_idx, 'N':N, 'name':cfg.name, 'diffusion_score':float(score)}
-
-    with open(f'{item_idx}_{n_idx}.yaml', 'w') as yaml_file:
-        yaml.dump(output, yaml_file)
+        with open(f'{I}_{n}.yaml', 'w') as yaml_file:
+            yaml.dump(output, yaml_file)
        
 
 if __name__ == '__main__':
