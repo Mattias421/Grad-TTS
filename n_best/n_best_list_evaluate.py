@@ -63,7 +63,7 @@ def main(cfg):
 
     N = cfg.n
 
-    diff_scores = np.genfromtxt(cfg.diff_score_list, delimiter=',').reshape((len(n_best_list), N))
+    diff_scores = np.load(cfg.diff_score_list).reshape((len(n_best_list), N))
 
     log.info(diff_scores.shape)
 
