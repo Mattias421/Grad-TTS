@@ -128,6 +128,6 @@ def get_likelihood_fn(sde, inverse_scaler, hutchinson_type='Rademacher',
       # offset = 7. - inverse_scaler(-1.)
       # bpd = bpd + offset
 
-      return bpd
+      return bpd, prior_logp, delta_logp, z
 
   return likelihood_fn
